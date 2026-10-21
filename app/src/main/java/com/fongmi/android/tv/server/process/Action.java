@@ -115,6 +115,26 @@ public class Action implements Process {
             case "next" -> App.post(service::dispatchNext);
             case "repeat" -> App.post(service::dispatchRepeat);
             case "replay" -> App.post(service::dispatchReplay);
+            case "seek" -> onSeek(service, params);
+            case "speed" -> onSpeed(service, params);
+            case "repeat_on" -> App.post(() -> service.player().setRepeatOne(true));
+            case "repeat_off" -> App.post(() -> service.player().setRepeatOne(false));
+        }
+    }
+
+    private void onSeek(PlaybackService service, Map<String, String> params) {
+        try {
+            long position = Long.parseLong(Objects.requireNonNullElse(params.get("position"), "-1"));
+            if (position >= 0) App.post(() -> service.player().seekTo(position));
+        } catch (NumberFormatException ignored) {
+        }
+    }
+
+    private void onSpeed(PlaybackService service, Map<String, String> params) {
+        try {
+            float speed = Float.parseFloat(Objects.requireNonNullElse(params.get("speed"), "0"));
+            if (speed > 0) App.post(() -> service.player().setSpeed(speed));
+        } catch (NumberFormatException ignored) {
         }
     }
 

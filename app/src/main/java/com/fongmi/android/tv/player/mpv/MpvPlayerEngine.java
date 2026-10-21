@@ -71,14 +71,13 @@ public class MpvPlayerEngine implements PlayerEngine, Player.Listener {
 
     @Override
     public SecondarySubtitleState getSecondarySubtitleState() {
-        return new SecondarySubtitleState(player.getPrimaryTextTrackSelectionOverride(), player.getSecondaryTextTrackSelectionOverride(), player.getSecondaryTextTrackSelectionOverrides(), player.isSecondaryTextTrackSuppressed());
+        // Secondary text tracks are not exposed by the legacy mpv snapshot.
+        return SecondarySubtitleState.EMPTY;
     }
 
     @Override
     public void setSecondarySubtitleSelection(@Nullable TrackSelectionOverride selection) {
-        int mode = SubtitleSetting.getSecondaryMode();
-        applySecondarySubtitleMode(mode);
-        if (mode != SubtitleSetting.SECONDARY_MODE_DEFAULT) player.setSecondaryTextTrackSelectionOverride(selection);
+        // No-op: the legacy mpv snapshot has no secondary text track API.
     }
 
     @Override
@@ -143,7 +142,6 @@ public class MpvPlayerEngine implements PlayerEngine, Player.Listener {
     }
 
     private void applySecondarySubtitleMode(int mode) {
-        if (mode == SubtitleSetting.SECONDARY_MODE_DEFAULT) player.resetSecondaryTextTrackSelection();
-        else player.setSecondaryTextTrackAutoSelectionEnabled(mode == SubtitleSetting.SECONDARY_MODE_AUTO);
+        // No-op: the legacy mpv snapshot has no secondary text track API.
     }
 }

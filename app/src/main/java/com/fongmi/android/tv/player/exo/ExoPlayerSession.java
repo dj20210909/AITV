@@ -134,8 +134,8 @@ final class ExoPlayerSession {
         String fontConfigPath = fontConfig != null && fontConfig.length() > 0 ? fontConfig.getAbsolutePath() : null;
         String fontFamily = libassEnabled ? SubtitleSetting.getFontFamily() : null;
         String fontsDirectory = libassEnabled ? ExternalFont.getDirectory().getAbsolutePath() : null;
-        LibassConfiguration configuration = new LibassConfiguration.Builder().setFontConfig(fontConfigPath).setFontsDirectory(fontsDirectory).setDefaultFontFamily(fontFamily).setMaximumRenderPixels(LIBASS_MAX_RENDER_PIXELS).setMaximumGlyphCount(LIBASS_MAX_GLYPH_COUNT).setMaximumBitmapCacheSizeMb(LIBASS_MAX_BITMAP_CACHE_SIZE_MB).build();
-        return new LibassPlaybackSession(configuration, libassEnabled);
+        // The public FongMi/media snapshot exposes the legacy path-based constructor.
+        return new LibassPlaybackSession(fontConfigPath, fontsDirectory, fontFamily, libassEnabled);
     }
 
     private final class PreloadListener implements PreloadManagerListener {

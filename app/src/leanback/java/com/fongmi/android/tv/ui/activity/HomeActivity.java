@@ -121,7 +121,13 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         mClock = Clock.create(mBinding.clock);
         mBinding.progressLayout.showProgress();
         PermissionUtil.requestNotify(this);
-        DLNARendererService.start(this);
+        try {
+            DLNARendererService.start(this);
+        } catch (RuntimeException e) {
+            // Android 12+ may reject a background service start when the activity is launched
+            // while the device is idle/dozing. The HTTP server and playback can still work.
+            e.printStackTrace();
+        }
         Updater.create().start(this);
         setRecyclerView();
         setViewModel();

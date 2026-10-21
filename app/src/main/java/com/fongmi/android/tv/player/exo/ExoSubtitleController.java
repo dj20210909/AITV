@@ -34,9 +34,8 @@ final class ExoSubtitleController {
     }
 
     void applySubtitleStyle() {
-        libassPlaybackSession.setBottomPositionFraction(SubtitleSetting.getPosition() / 100.0f);
-        libassPlaybackSession.setSecondaryBottomPositionFraction(getSecondaryBottomPositionFraction());
-        libassPlaybackSession.setFontScale(SubtitleSetting.isScaleApplied() ? SubtitleSetting.getAppliedScale() : 1.0f, true);
+        // The public libass snapshot has no position/scale setters; style overrides are handled
+        // by the view controller when the newer API is available.
         playerViewController.setStyleOverride(SubtitleSetting.isStyleForced() ? SubtitleSetting.getStyle() : null, SubtitleSetting.getFontFamily());
         playerViewController.setSecondarySubtitleViewConfigurator(this::applySecondarySubtitleStyle);
     }
