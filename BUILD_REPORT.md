@@ -157,6 +157,7 @@ app/src/main/java/com/fongmi/android/tv/server/process/Assistant.java
 - `POST /assistant/config/activate`：按 `id`（或 `type+url`）切换历史配置并重新加载。
 - `POST /assistant/config/delete`：删除历史配置；当前配置拒绝删除。
 - `GET /assistant/sites`：电视上已配置的点播源列表（key/name/searchable/quickSearch）。
+- `GET /assistant/vod/home?site=&tid=`：选中点播源时加载首页推荐海报；首页无视频时自动尝试前几个分类。
 - `GET /assistant/search?word=&site=&quick=`：并行搜索点播源，返回站点统计和 `siteKey/vodId/vodName/vodPic/vodRemarks/typeName` 等列表字段。
 - `GET /assistant/vod/detail?site=&id=`：返回播放源（flag/show）和集数名称，不返回剧集 URL。
 - `POST /assistant/vod/resolve`：`site/id/flag/episode`，解析单集播放地址、headers、HLS/DASH 标记；把 `127.0.0.1` 代理地址改写为电视局域网 IP，供手机本机播放。
@@ -198,6 +199,8 @@ assistant/app/build/outputs/apk/debug/app-debug.apk   # 约 24.5 MB
 | 饭太硬直播 | ✅ `http://193.123.86.190:14888/TV/iptv.php`，6 组 141 个频道 |
 | `/assistant/search?word=测试` | ✅ 200，`count=3`，返回 3 条结果和站点统计 |
 | `/assistant/search?word=庆余年` | ✅ 200，`count=131`，32 个源返回结果 |
+| `/assistant/vod/home` | ✅ 200；玩偶哥哥返回 80 个影视海报，分类 7 个 |
+| 助手源首页 UI | ✅ 点击源后下方加载海报网格，可直接点进详情 |
 | 饭太硬原始地址 | ❌ `http://www.饭太硬.com/tv` 域名已失效/停放，推送返回 500 |
 | `/assistant/vod/open` | ✅ 200 `OK`，AITV 前台时电视端 `VideoActivity` 成功回到前台 |
 | `/assistant/vod/detail` | ✅ 200，返回播放源和集数（如 `光影` 1 源 26 集、`AiDj` 1 源 122 集） |

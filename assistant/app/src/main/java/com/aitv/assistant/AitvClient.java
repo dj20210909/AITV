@@ -150,6 +150,13 @@ public final class AitvClient {
         return getJson(device.baseUrl + "/assistant/sites", 10000);
     }
 
+    /** GET /assistant/vod/home?site=&tid=: source home recommendations. */
+    public static JSONObject vodHome(AitvDevice device, String site, String tid) {
+        String path = "/assistant/vod/home?site=" + encode(site == null ? "" : site);
+        if (tid != null && !tid.isEmpty()) path += "&tid=" + encode(tid);
+        return getJson(device.baseUrl + path, 45000);
+    }
+
     /**
      * GET /assistant/search: parallel search across configured VOD sites.
      *

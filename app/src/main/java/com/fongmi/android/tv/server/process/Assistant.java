@@ -30,6 +30,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -74,6 +75,7 @@ public class Assistant implements Process {
                 || url.equals("/assistant/config/delete")
                 || url.equals("/assistant/sites")
                 || url.equals("/assistant/search")
+                || url.equals("/assistant/vod/home")
                 || url.equals("/assistant/vod/detail")
                 || url.equals("/assistant/vod/resolve")
                 || url.equals("/assistant/vod/play")
@@ -97,6 +99,7 @@ public class Assistant implements Process {
             if (url.equals("/assistant/info")) return Nano.ok(info().toString());
             if (url.equals("/assistant/configs")) return Nano.ok(configs().toString());
             if (url.equals("/assistant/sites")) return Nano.ok(sites().toString());
+            if (url.equals("/assistant/vod/home")) return Nano.ok(vodHome(session.getParms()).toString());
             if (url.equals("/assistant/vod/detail")) return Nano.ok(vodDetail(session.getParms()).toString());
             if (url.equals("/assistant/search")) return Nano.ok(search(session.getParms()).toString());
             return Nano.ok(live(session.getParms()).toString());
@@ -121,6 +124,63 @@ public class Assistant implements Process {
         }
         root.addProperty("home", VodConfig.get().getHome().getKey());
         root.add("sites", items);
+        return root;
+    }
+
+    private JsonObject vodHome(Map<String, String> params) throws Throwable {
+        String siteKey = trim(params.get("site"));
+        if (siteKey.isEmpty()) throw new Exception("Missing site");
+        VodConfig.get().ensureLoaded();
+        Site site = VodConfig.get().getSite(siteKey);
+        if (site.isEmpty()) throw new Exception("Site not found");
+        Result home = SiteApi.homeContent(site);
+        List<com.fongmi.android.tv.bean.Class> types = home.getTypes();
+        String tid = trim(params.get("tid"));
+        List<Vod> list = home.getList();
+        if (!tid.isEmpty()) {
+            Result category = SiteApi.categoryContent(siteKey, tid, "1", false, new HashMap<>());
+            list = category.getList();
+        } else if (list.isEmpty()) {
+            int tried = 0;
+            for (com.fongmi.android.tv.bean.Class type : types) {
+                if (type.getTypeId().isEmpty()) continue;
+                Result category = SiteApi.categoryContent(siteKey, type.getTypeId(), "1", false, new HashMap<>());
+                list = category.getList();
+                if (!list.isEmpty()) break;
+                if (++tried >= 6) break;
+            }
+        }
+        JsonObject root = new JsonObject();
+        root.addProperty("siteKey", siteKey);
+        root.addProperty("siteName", site.getName());
+        root.addProperty("tid", tid);
+        JsonArray categories = new JsonArray();
+        for (com.fongmi.android.tv.bean.Class type : types) {
+            JsonObject item = new JsonObject();
+            item.addProperty("id", type.getTypeId());
+            item.addProperty("name", type.getTypeName());
+            categories.add(item);
+        }
+        root.add("categories", categories);
+        JsonArray items = new JsonArray();
+        int count = 0;
+        for (Vod vod : list) {
+            if (vod == null || count >= 80) break;
+            JsonObject item = new JsonObject();
+            item.addProperty("siteKey", siteKey);
+            item.addProperty("siteName", site.getName());
+            item.addProperty("vodId", vod.getId());
+            item.addProperty("vodName", vod.getName());
+            item.addProperty("vodPic", vod.getPic());
+            item.addProperty("vodRemarks", vod.getRemarks());
+            item.addProperty("typeName", vod.getTypeName());
+            item.addProperty("vodYear", vod.getYear());
+            item.addProperty("vodArea", vod.getArea());
+            items.add(item);
+            count++;
+        }
+        root.addProperty("count", items.size());
+        root.add("items", items);
         return root;
     }
 
@@ -540,6 +600,7 @@ public class Assistant implements Process {
         capabilities.add("live");
         capabilities.add("sites");
         capabilities.add("vodSearch");
+        capabilities.add("vodHome");
         capabilities.add("vodDetail");
         capabilities.add("vodResolve");
         capabilities.add("vodPlay");

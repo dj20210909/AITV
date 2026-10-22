@@ -267,7 +267,7 @@ GET /assistant/info
   "versionCode": 563,
   "variant": "leanback",
   "device": "客厅电视",
-  "capabilities": ["control", "config", "configs", "configActivate", "configDelete", "search", "live", "sites", "vodSearch", "vodDetail", "vodPlay", "vodOpen"],
+  "capabilities": ["control", "config", "configs", "configActivate", "configDelete", "search", "live", "sites", "vodSearch", "vodHome", "vodDetail", "vodPlay", "vodOpen"],
   "live": {
     "name": "我的直播",
     "groups": 8,
@@ -407,6 +407,36 @@ GET /assistant/search?word=测试&site=test&quick=0
 - `word` 必填；`site` 可选，空表示所有可搜索站点；`quick=1` 只搜索启用快速搜索的站点。
 - AITV 内用 8 线程并行调用 `SiteApi.searchContent`，最多等待 25 秒；每个站点最多 60 条、总数最多 300 条，按 `siteKey + vodId` 去重。
 - 搜索只返回列表字段，不返回播放地址；助手点击结果后调用详情接口，在手机端选集/选源。
+
+```http
+GET /assistant/vod/home?site=test&tid=
+```
+
+```json
+{
+  "siteKey": "test",
+  "siteName": "测试点播源",
+  "tid": "",
+  "categories": [
+    { "id": "1", "name": "电影" }
+  ],
+  "count": 20,
+  "items": [
+    {
+      "siteKey": "test",
+      "siteName": "测试点播源",
+      "vodId": "1",
+      "vodName": "推荐影片",
+      "vodPic": "http://.../poster.jpg",
+      "vodRemarks": "更新至高清"
+    }
+  ]
+}
+```
+
+- 不传 `tid` 时先调用电视端 `SiteApi.homeContent`；如果首页没有直接视频，会尝试该源的前几个分类补全海报列表。
+- 传 `tid` 时直接请求对应分类第一页。
+- 助手点播搜索页选择某个源时，会调用该接口在下方加载该源的影视海报；也可以继续在该源内搜索。
 
 ```http
 GET /assistant/vod/detail?site=test&id=1
@@ -597,6 +627,7 @@ group=央视&channel=CCTV1
   → 切换历史配置：POST /assistant/config/activate
   → 删除历史配置：POST /assistant/config/delete
   → 点播源：GET /assistant/sites
+  → 选源首页：GET /assistant/vod/home?site=&tid=
   → 搜索：GET /assistant/search?word=&site=
   → 详情/选集/选源：GET /assistant/vod/detail?site=&id=
   → 本机解析：POST /assistant/vod/resolve（返回单集 URL/headers/format）
@@ -702,6 +733,7 @@ data class VodDetail(
 - 功能：扫描、设备缓存、状态、播放控制（快退/快进/跳转/倍速）、推送配置、配置历史管理、点播源搜索、点播详情（播放源/集数选择）、**本机 ExoPlayer 播放**、频道检索
 - 设备页：发现结果写入本地缓存；卡片用图标颜色区分在线/离线（在线为高亮色、离线为灰色，不再显示 leanback/旧接口/扩展等技术字段），离线卡片显示最后在线时间并可点击重新探测；左滑后显示红色“删除”按钮，点按钮才弹出确认框，确认后才移除缓存。
 - 配置页：增加远程配置列表（`nodeapp.uandj.site/api/ai-tv/addresses`），本地缓存 24 小时；每天自动刷新一次，也支持手动“更新”；每个配置可“一键写入电视”。
+- 点播搜索页选择某个源时，自动调用 `/assistant/vod/home` 加载该源首页海报；没有首页推荐时提示可直接搜索。
 - 点播搜索结果点击后进入手机端详情页：海报、简介、播放源 Chip、集数网格；底部两个悬浮按钮：
   - **本机播放**：调用 `/assistant/vod/resolve`，用 Media3 ExoPlayer 在手机本地播放（HLS/DASH/MP4，支持内置控制条、进度拖动和倍速）
   - **电视播放**：调用 `/assistant/vod/play`，按所选源和集数让电视直接起播
@@ -753,6 +785,7 @@ Release/assistant/aitv-assistant-debug.apk            # 同一 APK 的发布副�
 | 左滑删除 | 左滑先露出删除按钮；点击“删除”按钮才弹出确认框，再点确认移除，点“取消”卡片恢复 |
 | 助手 UI | Compose Material 3：设备页渐变 Hero、设备卡片；控制页 4 个 Tab、播放卡片、滑块/倍速、点播搜索海报网格、频道列表、配置页 |
 | 助手点播搜索 | 测试源：`/assistant/search?word=测试` 返回 3 条；真实源：`word=庆余年` 返回 **131 条 / 32 个可搜索源**，海报正常加载 |
+| 源首页推荐 | 点击“玩偶哥哥”源后加载 80 个影视海报；无首页推荐的源提示可直接搜索 |
 | 搜索键盘 | 点播搜索和频道搜索触发后自动 `clearFocus` + 收起软键盘 |
 | 饭太硬原地址 | ❌ `http://www.饭太硬.com/tv` 当前域名已失效/停放，AITV 推送返回 500；`fantaiying.com` 首页显示“Is for sale” |
 | 饭太硬可用镜像 | ✅ `https://qist.wyfc.qzz.io/fty.json`（`qist/tvbox` 的 fty 配置），`/assistant/sites` 返回 49 个站点、32 个可搜索源 |

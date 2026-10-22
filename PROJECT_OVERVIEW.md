@@ -218,7 +218,7 @@ $env:JAVA_HOME = 'D:\IDE\scoop\apps\temurin21-jdk\current'
 ### 2.7 独立助手 App（`assistant/`）
 
 - 独立 Gradle 工程，包名 `com.aitv.assistant`，不加入 AITV 的 `settings.gradle`。
-- 功能：局域网扫描/发现、设备缓存与在线标识、播放控制（`±10s/±30s`、进度条跳转、倍速）、推送配置、配置历史管理、点播源搜索、点播详情（播放源/集数选择）、本机 ExoPlayer 播放、频道检索。
+- 功能：局域网扫描/发现、设备缓存与在线标识、播放控制（`±10s/±30s`、进度条跳转、倍速）、推送配置、配置历史管理、点播源搜索、源首页海报推荐、点播详情（播放源/集数选择）、本机 ExoPlayer 播放、频道检索。
 - 设备页：扫描结果持久化；用图标颜色区分在线/离线（离线显示最后在线时间），不再展示 leanback/旧接口/扩展等技术字段；离线卡片点击重新探测；左滑露出删除按钮，点击按钮弹确认框，确认后才删除缓存；端口扫描预设 9978–9987 十个端口。
 - UI：**Kotlin + Jetpack Compose + Material 3**，动态取色/深浅色主题，Coil 3 加载海报；搜索结果点击进入手机端详情页，可“本机播放”（Media3 ExoPlayer）或“电视播放”（按所选源/集数直接起播）。
 - 本机播放：Media3 ExoPlayer 1.8.0 + `media3-ui` PlayerView + HLS/DASH 模块；支持播放器内置控制条、拖动进度和倍速。
@@ -748,6 +748,7 @@ Room 迁移：`Migrations.MIGRATION_30_31 … 34_35`，同时启用 `fallbackToD
 | `POST /assistant/config/delete` | `id` 或 `type`,`url` | 助手扩展：删除历史配置（当前配置拒绝） |
 | `GET /assistant/sites` | — | 助手扩展：点播源列表 |
 | `GET /assistant/search` | `word`,`site`,`quick` | 助手扩展：并行程搜索点播源，返回结果列表 |
+| `GET /assistant/vod/home` | `site`,`tid` | 助手扩展：源首页/分类推荐海报 |
 | `GET /assistant/vod/detail` | `site`,`id` | 助手扩展：返回播放源和集数名称（不含 URL） |
 | `POST /assistant/vod/resolve` | `site`,`id`,`flag`,`episode` | 助手扩展：解析单集 URL/headers/HLS-DASH，供手机 ExoPlayer 本地播放 |
 | `POST /assistant/vod/play` | `site`,`id`,`name`,`pic`,`flag`,`episode` | 助手扩展：按所选源/集数在电视端直接起播 |

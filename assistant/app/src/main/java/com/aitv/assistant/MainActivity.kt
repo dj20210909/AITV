@@ -876,6 +876,9 @@ private fun SearchTab(
     var site by remember { mutableStateOf("") }
     var sites by remember { mutableStateOf<List<SiteOption>>(emptyList()) }
     var results by remember { mutableStateOf<List<VodResult>>(emptyList()) }
+    var homeItems by remember { mutableStateOf<List<VodResult>>(emptyList()) }
+    var homeLoading by remember { mutableStateOf(false) }
+    var homeRequest by remember { mutableIntStateOf(0) }
     var searching by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("输入片名，搜索电视上配置的点播源") }
     var detail by remember { mutableStateOf<VodDetail?>(null) }
@@ -903,10 +906,43 @@ private fun SearchTab(
         }
     }
 
+    fun selectSite(key: String) {
+        focusManager.clearFocus()
+        keyboard?.hide()
+        site = key
+        results = emptyList()
+        homeRequest++
+        if (key.isEmpty()) {
+            homeItems = emptyList()
+            homeLoading = false
+            message = "输入片名，搜索电视上配置的点播源"
+            return
+        }
+        homeLoading = true
+        homeItems = emptyList()
+        message = "正在加载源首页推荐…"
+        val request = homeRequest
+        scope.launch {
+            val json = withContext(Dispatchers.IO) { AitvClient.vodHome(device, key, null) }
+            if (request != homeRequest) return@launch
+            val list = parseSearch(json)
+            homeItems = list
+            homeLoading = false
+            message = when {
+                json == null -> "该源暂不支持首页推荐，可直接输入片名搜索"
+                list.isEmpty() -> "该源暂无首页推荐，可直接输入片名搜索"
+                else -> "来自该源的推荐：${list.size} 个"
+            }
+        }
+    }
+
     fun runSearch() {
         focusManager.clearFocus()
         keyboard?.hide()
         if (word.isBlank() || searching) return
+        homeRequest++
+        homeItems = emptyList()
+        homeLoading = false
         searching = true
         message = "正在并发搜索…"
         scope.launch {
@@ -955,6 +991,8 @@ private fun SearchTab(
         return
     }
 
+    val displayItems = if (results.isNotEmpty() || searching) results else homeItems
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -985,14 +1023,14 @@ private fun SearchTab(
             item {
                 FilterChip(
                     selected = site.isEmpty(),
-                    onClick = { site = "" },
+                    onClick = { selectSite("") },
                     label = { Text("全部源") }
                 )
             }
             lazyItems(sites, key = { it.key }) { option ->
                 FilterChip(
                     selected = site == option.key,
-                    onClick = { site = option.key },
+                    onClick = { selectSite(option.key) },
                     label = { Text(option.name) }
                 )
             }
@@ -1022,11 +1060,16 @@ private fun SearchTab(
             Spacer(Modifier.height(4.dp))
         }
 
-        if (results.isEmpty() && !searching) {
+        if (homeLoading) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(4.dp))
+        }
+
+        if (displayItems.isEmpty() && !searching && !homeLoading) {
             EmptyState(
                 icon = Icons.Rounded.Movie,
                 title = "搜索点播源",
-                message = "输入片名后，助手会并行搜索电视上配置的所有可搜索站点，并按海报展示结果。",
+                message = "输入片名后，助手会并行搜索电视上配置的所有可搜索站点，并按海报展示结果；选择某个源也可以浏览它的首页推荐。",
                 modifier = Modifier.weight(1f)
             )
         } else {
@@ -1037,7 +1080,7 @@ private fun SearchTab(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                gridItems(results, key = { it.siteKey + "|" + it.vodId }) { item ->
+                gridItems(displayItems, key = { it.siteKey + "|" + it.vodId }) { item ->
                     VodCard(item) { openDetail(item) }
                 }
             }
