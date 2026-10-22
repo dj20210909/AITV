@@ -45,6 +45,19 @@ data class ConfigEntry(
     val current: Boolean
 )
 
+data class RemoteConfig(
+    val id: String,
+    val name: String,
+    val url: String,
+    val source: String,
+    val recommended: Boolean,
+    val available: Boolean,
+    val siteCount: Int,
+    val liveCount: Int,
+    val parseCount: Int,
+    val group: String
+)
+
 data class DeviceEntry(
     val device: AitvDevice,
     val online: Boolean,
@@ -283,4 +296,38 @@ fun formatLastSeen(value: Long): String {
         minutes < 60 * 24 -> "${minutes / 60} 小时前"
         else -> SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(value))
     }
+}
+
+fun parseRemoteConfigs(json: JSONObject?): List<RemoteConfig> {
+    val array = json?.optJSONArray("addresses") ?: return emptyList()
+    val result = ArrayList<RemoteConfig>(array.length())
+    for (i in 0 until array.length()) {
+        val item = array.optJSONObject(i) ?: continue
+        val url = item.optString("url")
+        if (url.isEmpty()) continue
+        val name = item.optString("name").ifBlank { item.optString("id", url) }
+        val aliases = ArrayList<String>()
+        val aliasesArray = item.optJSONArray("aliases")
+        if (aliasesArray != null) {
+            for (j in 0 until aliasesArray.length()) {
+                val alias = aliasesArray.optString(j)
+                if (alias.isNotEmpty()) aliases.add(alias)
+            }
+        }
+        result.add(
+            RemoteConfig(
+                id = item.optString("id", url),
+                name = name,
+                url = url,
+                source = item.optString("source"),
+                recommended = item.optBoolean("recommended", false),
+                available = item.optBoolean("available", true),
+                siteCount = item.optInt("siteCount", 0),
+                liveCount = item.optInt("liveCount", 0),
+                parseCount = item.optInt("parseCount", 0),
+                group = item.optString("group")
+            )
+        )
+    }
+    return result
 }

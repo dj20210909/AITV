@@ -489,6 +489,48 @@ site=test&id=1&name=测试电影&pic=http://.../poster.png
 
 > 这是本仓库的扩展，不是官方 5.7.8 的标准接口。助手应先用 `/assistant/info` 判断是否支持；不支持时显示“该设备不支持频道列表”，仍保留旧版控制/搜索。
 
+### 4.2.3 助手远程配置列表
+
+助手配置页额外接入了一个 TvBox 配置聚合接口（参考 `ai-tv` 页面，不复制/提交该 HTML 文件）：
+
+```http
+GET https://nodeapp.uandj.site/api/ai-tv/addresses?limit=1000
+```
+
+返回：
+
+```json
+{
+  "success": true,
+  "total": 93,
+  "addresses": [
+    {
+      "id": "qist:jsm.json",
+      "name": "jsm",
+      "url": "https://raw.githubusercontent.com/qist/tvbox/master/jsm.json",
+      "source": "qist",
+      "recommended": true,
+      "available": true,
+      "siteCount": 152,
+      "liveCount": 3,
+      "parseCount": 29
+    }
+  ]
+}
+```
+
+助手侧规则：
+
+- 拉取成功后把原始 JSON + `fetchedAt` 缓存到 SharedPreferences；
+- 打开配置页时，缓存未超过 **24 小时**就直接使用，不重复请求；
+- 超过 24 小时或用户点击“更新”才重新拉取；
+- 拉取失败保留旧缓存并显示错误；
+- 列表预览前 8 个，可展开查看全部 93 个；
+- 每个配置提供“**一键写入电视**”，复用 `POST /assistant/config`（type=0），写入成功刷新当前配置和历史；
+- 不可用（`available=false`）的条目禁用写入按钮。
+
+> 远程列表只提供 TVBox 配置 URL，不包含播放地址；实际源可用性由配置本身和电视端解析决定。
+
 ### 4.3 频道播放（后续扩展点）
 
 `/assistant/live` 只做检索。若需要“点频道直接播放”，建议再加：
@@ -659,6 +701,7 @@ data class VodDetail(
 - 包名：`com.aitv.assistant`
 - 功能：扫描、设备缓存、状态、播放控制（快退/快进/跳转/倍速）、推送配置、配置历史管理、点播源搜索、点播详情（播放源/集数选择）、**本机 ExoPlayer 播放**、频道检索
 - 设备页：发现结果写入本地缓存；卡片用图标颜色区分在线/离线（在线为高亮色、离线为灰色，不再显示 leanback/旧接口/扩展等技术字段），离线卡片显示最后在线时间并可点击重新探测；左滑后显示红色“删除”按钮，点按钮才弹出确认框，确认后才移除缓存。
+- 配置页：增加远程配置列表（`nodeapp.uandj.site/api/ai-tv/addresses`），本地缓存 24 小时；每天自动刷新一次，也支持手动“更新”；每个配置可“一键写入电视”。
 - 点播搜索结果点击后进入手机端详情页：海报、简介、播放源 Chip、集数网格；底部两个悬浮按钮：
   - **本机播放**：调用 `/assistant/vod/resolve`，用 Media3 ExoPlayer 在手机本地播放（HLS/DASH/MP4，支持内置控制条、进度拖动和倍速）
   - **电视播放**：调用 `/assistant/vod/play`，按所选源和集数让电视直接起播
@@ -699,6 +742,9 @@ Release/assistant/aitv-assistant-debug.apk            # 同一 APK 的发布副�
 | `/assistant/config/activate` | 200 `OK`，激活 id=8 后 `/assistant/live` 返回 6 组 141 频道 |
 | `/assistant/config/delete` | 200 `OK`，删除 id=7；尝试删除当前配置被拒绝 |
 | 助手配置历史 UI | 当前配置卡片 + “已保存配置”列表，非当前项提供“使用/删除”，当前项显示“当前”徽标 |
+| 远程配置列表 | 从 `nodeapp.uandj.site` 拉取 93 个 TVBox 配置，展示推荐/统计/URL，缓存到本地 |
+| 远程配置缓存 | 24 小时内再次打开配置页不重复请求；手动“更新”强制刷新 |
+| 一键写入电视 | 点击远程配置“一键写入电视”，AITV 当前配置变为该 URL，并刷新配置历史 |
 | `/action?do=control` | 200；`type=pause` 返回 `OK`；`type=seek position=3000` 后 `/media` position=3000；`type=speed speed=1.5` 后 `/media` speed=1.5 |
 | 助手控制 UI | 旧版 5.6.3 + 助手扩展也显示 `-30s/-10s/+10s/+30s`、跳转滑块和“倍速”Chip；选择 1.5x 后电视实际生效 |
 | `/media` | 200，空闲时返回 `{}` |

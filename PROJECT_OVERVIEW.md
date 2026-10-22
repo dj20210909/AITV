@@ -227,6 +227,7 @@ $env:JAVA_HOME = 'D:\IDE\scoop\apps\temurin21-jdk\current'
   - 新版：`/remote`、`/remote/info`
   - 本仓库扩展：`/assistant/info`、`/assistant/live`、`/assistant/config`、`/assistant/configs`、`/assistant/config/activate`、`/assistant/config/delete`、`/assistant/sites`、`/assistant/search`、`/assistant/vod/detail`、`/assistant/vod/resolve`、`/assistant/vod/play`、`/assistant/vod/open`
 - 配置推送会直接写入电视的 Room `Config` 历史表，再加载；助手配置页可以查看当前配置、切换历史配置和删除非当前配置。
+- 配置页包含远程配置列表：从 `nodeapp.uandj.site/api/ai-tv/addresses` 拉取 TVBox 配置，缓存 24 小时、每天自动刷新一次，并支持一键写入电视。
 - 点播搜索由 AITV 侧并行调用 `SiteApi.searchContent`，详情由 `SiteApi.detailContent` 返回播放源和集数；助手只展示名称，不保存剧集 URL。
 - 文档：`ASSISTANT_INTEGRATION.md`；APK：`assistant/app/build/outputs/apk/debug/app-debug.apk`（约 24.5 MB）。
 

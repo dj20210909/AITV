@@ -233,6 +233,7 @@ public final class AitvClient {
             if (code < 200 || code >= 300 || text.isEmpty()) return null;
             return new JSONObject(text);
         } catch (Exception ignored) {
+            ignored.printStackTrace();
             return null;
         } finally {
             if (connection != null) connection.disconnect();

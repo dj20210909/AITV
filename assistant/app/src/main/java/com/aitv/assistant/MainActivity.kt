@@ -128,6 +128,8 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private val DeviceRevealWidth = 88.dp
+private const val REMOTE_CONFIG_URL = "https://nodeapp.uandj.site/api/ai-tv/addresses?limit=1000"
+private const val REMOTE_CONFIG_REFRESH_MS = 24L * 60 * 60 * 1000
 
 class MainActivity : ComponentActivity() {
 
@@ -1268,6 +1270,13 @@ private fun ConfigTab(
     var loadingConfigs by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<ConfigEntry?>(null) }
     val types = listOf("点播", "直播", "壁纸")
+    val context = LocalContext.current
+    var remoteConfigs by remember { mutableStateOf<List<RemoteConfig>>(emptyList()) }
+    var remoteFetchedAt by remember { mutableStateOf(0L) }
+    var remoteLoading by remember { mutableStateOf(false) }
+    var remoteError by remember { mutableStateOf<String?>(null) }
+    var remoteExpanded by remember { mutableStateOf(false) }
+    var writingRemoteId by remember { mutableStateOf<String?>(null) }
 
     fun loadConfigs() {
         if (!device.assistant) return
@@ -1310,6 +1319,67 @@ private fun ConfigTab(
             snackbar.showSnackbar(if (ok) "配置已删除" else "删除失败")
             if (ok) loadConfigs()
         }
+    }
+
+    fun loadRemoteCache() {
+        val cached = RemoteConfigStore.load(context) ?: return
+        try {
+            val parsed = parseRemoteConfigs(JSONObject(cached.raw))
+            if (parsed.isNotEmpty()) {
+                remoteConfigs = parsed
+                remoteFetchedAt = cached.fetchedAt
+            }
+        } catch (ignored: Exception) {
+        }
+    }
+
+    fun refreshRemote(force: Boolean) {
+        if (remoteLoading) return
+        val now = System.currentTimeMillis()
+        if (!force && remoteFetchedAt > 0 && now - remoteFetchedAt < REMOTE_CONFIG_REFRESH_MS) return
+        remoteLoading = true
+        remoteError = null
+        scope.launch {
+            val json = withContext(Dispatchers.IO) { AitvClient.getJson(REMOTE_CONFIG_URL, 20000) }
+            remoteLoading = false
+            if (json == null) {
+                remoteError = if (remoteConfigs.isEmpty()) {
+                    "远程配置更新失败，请点“更新”重试"
+                } else {
+                    "远程配置更新失败，当前显示本地缓存"
+                }
+                return@launch
+            }
+            val list = parseRemoteConfigs(json)
+            if (list.isEmpty()) {
+                remoteError = "远程配置列表为空"
+                return@launch
+            }
+            remoteConfigs = list
+            remoteFetchedAt = System.currentTimeMillis()
+            RemoteConfigStore.save(context, json.toString(), remoteFetchedAt)
+        }
+    }
+
+    fun writeRemote(config: RemoteConfig) {
+        if (!config.available || writingRemoteId != null) return
+        writingRemoteId = config.id
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                AitvClient.pushConfig(device, config.url, config.name, 0)
+            }
+            writingRemoteId = null
+            snackbar.showSnackbar(if (ok) "已写入电视：${config.name}" else "写入失败：${config.name}")
+            if (ok) {
+                type = 0
+                loadConfigs()
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        loadRemoteCache()
+        refreshRemote(false)
     }
 
     LaunchedEffect(device, type) { loadConfigs() }
@@ -1367,6 +1437,82 @@ private fun ConfigTab(
                         )
                     }
                 }
+            }
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "远程配置",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f)
+                )
+                if (remoteLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                }
+                TextButton(onClick = { refreshRemote(true) }, enabled = !remoteLoading) {
+                    Text("更新")
+                }
+            }
+            Text(
+                "来源 nodeapp.uandj.site · 每天自动更新一次 · 上次更新 ${
+                    if (remoteFetchedAt > 0) formatConfigTime(remoteFetchedAt) else "尚未拉取"
+                }",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            remoteError?.let {
+                Spacer(Modifier.height(2.dp))
+                Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+            }
+        }
+
+        if (!remoteExpanded && remoteConfigs.isNotEmpty()) {
+            item {
+                val preview = remoteConfigs.filter { it.available }.ifEmpty { remoteConfigs }.take(8)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    lazyItems(preview, key = { it.id }) { config ->
+                        RemoteConfigCard(
+                            config = config,
+                            writing = writingRemoteId == config.id,
+                            onWrite = { writeRemote(config) }
+                        )
+                    }
+                }
+                if (remoteConfigs.size > preview.size) {
+                    TextButton(onClick = { remoteExpanded = true }) {
+                        Text("查看全部 ${remoteConfigs.size} 个配置")
+                    }
+                }
+            }
+        } else if (remoteExpanded) {
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "远程配置 · ${remoteConfigs.size} 个",
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { remoteExpanded = false }) { Text("收起") }
+                }
+            }
+            lazyItems(remoteConfigs, key = { "remote:" + it.id }) { config ->
+                RemoteConfigRow(
+                    config = config,
+                    writing = writingRemoteId == config.id,
+                    onWrite = { writeRemote(config) }
+                )
+            }
+        } else if (remoteLoading) {
+            item {
+                Text(
+                    "正在拉取远程配置…",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
@@ -1500,6 +1646,112 @@ private fun ConfigTab(
                 TextButton(onClick = { pendingDelete = null }) { Text("取消") }
             }
         )
+    }
+}
+
+@Composable
+private fun RemoteConfigCard(
+    config: RemoteConfig,
+    writing: Boolean,
+    onWrite: () -> Unit
+) {
+    Card(modifier = Modifier.width(232.dp)) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    config.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                if (config.recommended) {
+                    Text("推荐", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+            Text(
+                "影视 ${config.siteCount} · 直播 ${config.liveCount} · 解析 ${config.parseCount}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                config.url,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (!config.available) {
+                Text("远程检测不可用", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+            }
+            TextButton(
+                onClick = onWrite,
+                enabled = config.available && !writing,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (writing) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(6.dp))
+                }
+                Text(if (writing) "写入中…" else "一键写入电视")
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemoteConfigRow(
+    config: RemoteConfig,
+    writing: Boolean,
+    onWrite: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        config.name,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (config.recommended) {
+                        Spacer(Modifier.width(6.dp))
+                        Text("推荐", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                Text(
+                    "影视 ${config.siteCount} · 直播 ${config.liveCount} · 解析 ${config.parseCount}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    config.url,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (!config.available) {
+                    Text("远程检测不可用", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                }
+            }
+            TextButton(onClick = onWrite, enabled = config.available && !writing) {
+                if (writing) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("写入")
+                }
+            }
+        }
     }
 }
 
