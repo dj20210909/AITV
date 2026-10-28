@@ -25,6 +25,7 @@ import androidx.media3.common.Player;
 import androidx.media3.common.VideoSize;
 import androidx.media3.ui.PlayerSeekView;
 import androidx.media3.ui.PlayerView;
+import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewbinding.ViewBinding;
 
@@ -76,6 +77,7 @@ import com.fongmi.android.tv.ui.dialog.ChapterDialog;
 import com.fongmi.android.tv.ui.dialog.ContentDialog;
 import com.fongmi.android.tv.ui.dialog.DanmakuDialog;
 import com.fongmi.android.tv.ui.dialog.EditionDialog;
+import com.fongmi.android.tv.ui.dialog.EpisodeDialog;
 import com.fongmi.android.tv.ui.dialog.ParseDialog;
 import com.fongmi.android.tv.ui.dialog.PlayerEngineDialog;
 import com.fongmi.android.tv.ui.dialog.SpeedSettingDialog;
@@ -109,6 +111,7 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
     private VodPlaybackController mVod;
     private FlagAdapter mFlagAdapter;
     private EpisodeAdapter mEpisodeAdapter;
+    private List<Episode> mEpisodeItems;
     private QualityAdapter mQualityAdapter;
     private ArrayAdapter mArrayAdapter;
     private PartAdapter mPartAdapter;
@@ -318,6 +321,7 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
         mBinding.control.action.danmaku.setOnClickListener(view -> onDanmaku());
         mBinding.control.action.edition.setOnClickListener(view -> onEdition());
         mBinding.control.action.chapter.setOnClickListener(view -> onChapter());
+        mBinding.control.action.episodes.setOnClickListener(view -> onEpisodes());
         mBinding.control.action.opening.setOnClickListener(view -> onOpening());
         mBinding.control.action.speed.setOnLongClickListener(view -> onSpeedLong());
         mBinding.control.action.ending.setOnLongClickListener(view -> onEndingReset());
@@ -329,16 +333,10 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
                 if (mFlagAdapter.getItemCount() > 0) onItemClick(mFlagAdapter.get(position));
             }
         });
-        mBinding.episode.addOnChildViewHolderSelectedListener(new OnChildViewHolderSelectedListener() {
-            @Override
-            public void onChildViewHolderSelected(@NonNull RecyclerView parent, @Nullable RecyclerView.ViewHolder child, int position, int subposition) {
-                if (child != null && mBinding.video != mFocus1) mFocus1 = child.itemView;
-            }
-        });
         mBinding.array.addOnChildViewHolderSelectedListener(new OnChildViewHolderSelectedListener() {
             @Override
             public void onChildViewHolderSelected(@NonNull RecyclerView parent, @Nullable RecyclerView.ViewHolder child, int position, int subposition) {
-                if (mEpisodeAdapter.getItemCount() > 20 && position > 1) mBinding.episode.setSelectedPosition((position - 2) * 20);
+                if (mEpisodeAdapter.getItemCount() > 20 && position > 1) mBinding.episode.scrollToPosition((position - 2) * 20);
             }
         });
     }
@@ -347,8 +345,8 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
         mBinding.flag.setHorizontalSpacing(ResUtil.dp2px(8));
         mBinding.flag.setRowHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
         mBinding.flag.setAdapter(mFlagAdapter = new FlagAdapter(this));
-        mBinding.episode.setHorizontalSpacing(ResUtil.dp2px(8));
-        mBinding.episode.setRowHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
+        mBinding.episode.setLayoutManager(new GridLayoutManager(this, 8));
+        mBinding.episode.setNestedScrollingEnabled(false);
         mBinding.episode.setAdapter(mEpisodeAdapter = new EpisodeAdapter(this));
         mBinding.quality.setHorizontalSpacing(ResUtil.dp2px(8));
         mBinding.quality.setRowHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -599,13 +597,13 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
     @Override
     public void renderEpisodeSelection(Episode item) {
         notifyItemChanged(mBinding.episode, mEpisodeAdapter);
-        mBinding.episode.setSelectedPosition(mEpisodeAdapter.getPosition());
+        mBinding.episode.scrollToPosition(mEpisodeAdapter.getPosition());
     }
 
     @Override
     public void renderReverseEpisodes(List<Episode> items, boolean scroll) {
         setEpisodeAdapter(items);
-        if (scroll) mBinding.episode.setSelectedPosition(mEpisodeAdapter.getPosition());
+        if (scroll) mBinding.episode.scrollToPosition(mEpisodeAdapter.getPosition());
     }
 
     @Override
@@ -762,10 +760,36 @@ public class VideoActivity extends PlaybackActivity implements VodPlaybackHost, 
     }
 
     private void setEpisodeAdapter(List<Episode> items) {
+        mEpisodeItems = items;
+        applyEpisodeSpan(items);
         mBinding.episode.setVisibility(items.isEmpty() ? View.GONE : View.VISIBLE);
+        // 控制条上的「选集」按钮：多集才显示；隐藏时把控制条的左右环绕交还给「下集」
+        boolean show = items.size() > 1;
+        mBinding.control.action.episodes.setVisibility(show ? View.VISIBLE : View.GONE);
+        mBinding.control.action.next.setNextFocusLeftId(show ? R.id.episodes : R.id.ending);
         mEpisodeAdapter.addAll(items);
         setArrayAdapter(items.size());
         setR2Callback();
+    }
+
+    private void onEpisodes() {
+        if (mEpisodeItems == null || mEpisodeItems.size() <= 1) return;
+        EpisodeDialog.create().items(mEpisodeItems).listener(this::onItemClick).show(this);
+    }
+
+    /**
+     * 单元格宽度由最长剧集名决定，列数按剩余宽度算，保证每格一样大又不留大片空隙。
+     */
+    private void applyEpisodeSpan(List<Episode> items) {
+        int span = spanOf(items, ResUtil.getScreenWidth() - ResUtil.dp2px(48));
+        if (mBinding.episode.getLayoutManager() instanceof GridLayoutManager manager) manager.setSpanCount(span);
+        mEpisodeAdapter.setSpan(span);
+    }
+
+    private int spanOf(List<Episode> items, int available) {
+        if (items == null || items.isEmpty()) return 8;
+        int cell = EpisodeAdapter.cellWidth(items);
+        return Math.max(4, available / Math.max(cell, ResUtil.dp2px(48)));
     }
 
     @Override

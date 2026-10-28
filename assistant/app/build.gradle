@@ -3,6 +3,10 @@ plugins {
     id 'org.jetbrains.kotlin.plugin.compose'
 }
 
+def localProps = new Properties()
+def localFile = rootProject.file('local.properties')
+if (localFile.exists()) localFile.withInputStream { localProps.load(it) }
+
 android {
     namespace 'com.aitv.assistant'
     compileSdk 37
@@ -11,13 +15,23 @@ android {
         applicationId "com.aitv.assistant"
         minSdk 24
         targetSdk 37
-        versionCode 2
-        versionName "0.2.0"
+        versionCode 6
+        versionName "0.2.4"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file(localProps['storeFile'])
+            keyAlias localProps['keyAlias']
+            keyPassword localProps['storePassword']
+            storePassword localProps['storePassword']
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -43,6 +57,16 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+    }
+}
+
+def appVersionName = android.defaultConfig.versionName
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.each { output ->
+            output.outputFileName.set("aitv-assistant-${appVersionName}-${variant.buildType}.apk")
+        }
     }
 }
 

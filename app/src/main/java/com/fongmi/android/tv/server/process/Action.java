@@ -4,6 +4,7 @@ import android.text.TextUtils;
 
 import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.Constant;
+import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.api.config.VodConfig;
 import com.fongmi.android.tv.bean.Config;
 import com.fongmi.android.tv.bean.Device;
@@ -20,6 +21,7 @@ import com.fongmi.android.tv.server.impl.Process;
 import com.fongmi.android.tv.service.PlaybackService;
 import com.fongmi.android.tv.utils.FileUtil;
 import com.fongmi.android.tv.utils.Notify;
+import com.fongmi.android.tv.utils.PeerAuth;
 import com.github.catvod.net.OkHttp;
 import com.github.catvod.utils.Path;
 
@@ -169,7 +171,9 @@ public class Action implements Process {
 
     private void post(Device device, String type, FormBody.Builder body) {
         try {
-            OkHttp.newCall(OkHttp.client(Constant.TIMEOUT_SYNC), device.getIp().concat("/action?do=sync&mode=0&type=" + type), body.build()).execute();
+            okhttp3.Response response = PeerAuth.call(OkHttp.client(Constant.TIMEOUT_SYNC), device, device.getIp().concat("/action?do=sync&mode=0&type=" + type), body.build()).execute();
+            if (response.code() == 401) App.post(() -> Notify.show(R.string.server_pair_required));
+            response.close();
         } catch (Exception e) {
             App.post(() -> Notify.show(e.getMessage()));
         }

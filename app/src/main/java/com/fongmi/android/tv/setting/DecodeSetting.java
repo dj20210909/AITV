@@ -7,7 +7,9 @@ import com.github.catvod.utils.Prefers;
 public class DecodeSetting {
 
     public static boolean isAudioPassThrough() {
-        return Prefers.getBoolean("decode_audio_pass_through", Prefers.getBoolean("audio_pass_through", true));
+        // 默认关闭音频直通：直通会把 AC3/E-AC3/DTS 原样丢给音频 HAL，手机/没接功放的电视
+        // 上这些音轨直接没声音（要手动切音轨才有声）。关闭后走内置解码器，兼容性最好。
+        return Prefers.getBoolean("decode_audio_pass_through", Prefers.getBoolean("audio_pass_through", false));
     }
 
     public static void putAudioPassThrough(boolean audioPassThrough) {

@@ -1,6 +1,8 @@
 package com.fongmi.android.tv.ui.adapter;
 
+import android.graphics.Paint;
 import android.view.LayoutInflater;
+import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
@@ -20,11 +22,28 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
     private final int maxWidth;
     private int nextFocusDown;
     private int nextFocusUp;
+    private int span = 1;
 
     public EpisodeAdapter(OnClickListener listener) {
         mListener = listener;
         mItems = new ArrayList<>();
         maxWidth = ResUtil.getScreenWidth() - ResUtil.dp2px(48);
+    }
+
+    /**
+     * 用最长的一条剧集名量出单元格宽度：宽度随内容变化，但同一列表里每格一样大。
+     */
+    public static int cellWidth(List<Episode> items) {
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setTextSize(ResUtil.sp2px(16));
+        int width = 0;
+        for (Episode item : items) width = Math.max(width, (int) paint.measureText(item.getDesc().concat(item.getName())));
+        return Math.max(ResUtil.dp2px(48), width + ResUtil.dp2px(28));
+    }
+
+    public void setSpan(int span) {
+        this.span = Math.max(1, span);
+        notifyDataSetChanged();
     }
 
     public void addAll(List<Episode> items) {
@@ -85,8 +104,14 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Episode item = mItems.get(position);
         holder.binding.text.setMaxWidth(maxWidth);
-        holder.binding.text.setNextFocusUpId(nextFocusUp);
-        holder.binding.text.setNextFocusDownId(nextFocusDown);
+        if (mItems.size() > span) {
+            // 只在首行/末行接管上下键，网格内部交给系统按几何位置找焦点
+            holder.binding.text.setNextFocusUpId(position < span ? nextFocusUp : View.NO_ID);
+            holder.binding.text.setNextFocusDownId(position >= mItems.size() - span ? nextFocusDown : View.NO_ID);
+        } else {
+            holder.binding.text.setNextFocusUpId(nextFocusUp);
+            holder.binding.text.setNextFocusDownId(nextFocusDown);
+        }
         holder.binding.text.setSelected(item.isSelected());
         holder.binding.text.setText(item.getDesc().concat(item.getName()));
         holder.binding.getRoot().setOnClickListener(v -> mListener.onItemClick(item));

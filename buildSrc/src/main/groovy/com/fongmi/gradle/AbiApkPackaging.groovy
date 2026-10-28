@@ -35,7 +35,7 @@ class AbiApkPackaging {
         def device = flavors['device'] ?: 'device'
         variant.outputs.each { output ->
             def abi = output.filters.find { it.filterType.name() == 'ABI' }?.identifier?.replace('-', '_') ?: 'universal'
-            output.outputFileName.set("${device}-${abi}.apk")
+            output.outputFileName.set("aitv-${device}-${abi}.apk")
         }
         return device
     }
@@ -67,7 +67,7 @@ class AbiApkPackaging {
         project.tasks.matching { it.name == taskName }.configureEach {
             doLast {
                 project.copy {
-                    from project.fileTree(dir: apkDirectory, include: "${device}-*.apk")
+                    from project.fileTree(dir: apkDirectory, include: "aitv-${device}-*.apk")
                     into project.rootProject.file('Release/apk')
                     eachFile { it.path = it.name }
                     includeEmptyDirs = false

@@ -1,3 +1,4 @@
 <resources>
+    <color name="ic_launcher_background">#010A33</color>
     <color name="channel_header">#1565C0</color>
 </resources>

@@ -13,9 +13,16 @@ public final class AitvDevice {
     public final String variant;
     public final boolean modern;
     public final boolean assistant;
+    /** 电视端是否已接受本机令牌；旧版本电视没有配对概念，视为已配对。 */
+    public final boolean paired;
 
     public AitvDevice(String uuid, String name, String baseUrl, int type, String version,
                       String variant, boolean modern, boolean assistant) {
+        this(uuid, name, baseUrl, type, version, variant, modern, assistant, true);
+    }
+
+    public AitvDevice(String uuid, String name, String baseUrl, int type, String version,
+                      String variant, boolean modern, boolean assistant, boolean paired) {
         this.uuid = uuid;
         this.name = name;
         this.baseUrl = baseUrl;
@@ -24,6 +31,7 @@ public final class AitvDevice {
         this.variant = variant;
         this.modern = modern;
         this.assistant = assistant;
+        this.paired = paired;
     }
 
     public String typeLabel() {

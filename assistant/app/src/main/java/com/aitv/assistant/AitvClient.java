@@ -11,6 +11,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Minimal HTTP client for the AITV LAN API.
@@ -18,12 +19,50 @@ import java.util.Map;
  * <p>Supports both the legacy 5.6.x endpoints (/device, /action, /media) and the newer 5.7.x
  * endpoints (/remote, /remote/info). No Origin header is sent, so the app's same-origin check
  * accepts native requests.
+ *
+ * <p>电视端启用配对后，除只读的发现/媒体端点外的请求都需要携带令牌。令牌按设备 baseUrl
+ * 保存在 {@link #TOKENS} 里，{@link #open} 会自动加上请求头。
  */
 public final class AitvClient {
 
     private static final String USER_AGENT = "AITVAssistant/0.1";
+    private static final String TOKEN_HEADER = "X-AITV-Token";
+
+    /** baseUrl → 配对令牌。 */
+    private static final Map<String, String> TOKENS = new ConcurrentHashMap<>();
 
     private AitvClient() {
+    }
+
+    public static void setToken(String baseUrl, String token) {
+        if (baseUrl == null) return;
+        if (token == null || token.isEmpty()) TOKENS.remove(baseUrl);
+        else TOKENS.put(baseUrl, token);
+    }
+
+    public static String getToken(String baseUrl) {
+        return baseUrl == null ? null : TOKENS.get(baseUrl);
+    }
+
+    public static void loadTokens(Map<String, String> tokens) {
+        TOKENS.clear();
+        if (tokens != null) TOKENS.putAll(tokens);
+    }
+
+    /**
+     * 用电视上显示的 6 位配对码换取长期令牌，成功后自动记住。
+     *
+     * @return 令牌，失败返回 null。
+     */
+    public static String pair(String baseUrl, String code) {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("code", code == null ? "" : code.trim());
+        JSONObject json = postJson(baseUrl + "/pair", params, 5000);
+        if (json == null) return null;
+        String token = json.optString("token", "");
+        if (token.isEmpty()) return null;
+        setToken(baseUrl, token);
+        return token;
     }
 
     public static AitvDevice probe(String host, int port) {
@@ -40,17 +79,19 @@ public final class AitvClient {
         String variant = modern ? remoteInfo.optString("variant", "") : "";
 
         boolean assistant = false;
+        boolean paired = true;
         if (!modern || version.isEmpty()) {
             JSONObject info = getJson(base + "/assistant/info", 1200);
             if (info != null) {
                 assistant = true;
                 if (version.isEmpty()) version = info.optString("version", "");
                 if (variant.isEmpty()) variant = info.optString("variant", "");
+                paired = info.optBoolean("paired", true);
             }
         }
         if (variant.isEmpty()) variant = device.optInt("type", 0) == 0 ? "leanback" : "mobile";
         int type = device.optInt("type", 0);
-        return new AitvDevice(uuid, name.isEmpty() ? host : name, base, type, version, variant, modern, assistant);
+        return new AitvDevice(uuid, name.isEmpty() ? host : name, base, type, version, variant, modern, assistant, paired);
     }
 
     /** GET /remote (new) or /media (legacy). */
@@ -286,8 +327,18 @@ public final class AitvClient {
         connection.setReadTimeout(timeoutMs);
         connection.setRequestProperty("User-Agent", USER_AGENT);
         connection.setRequestProperty("Accept", "application/json, text/plain, */*");
+        String token = TOKENS.get(baseOf(url));
+        if (token != null && !token.isEmpty()) connection.setRequestProperty(TOKEN_HEADER, token);
         connection.setInstanceFollowRedirects(true);
         return connection;
+    }
+
+    /** http://host:port/path?x → http://host:port */
+    private static String baseOf(String url) {
+        int start = url.indexOf("://");
+        if (start < 0) return url;
+        int end = url.indexOf('/', start + 3);
+        return end < 0 ? url : url.substring(0, end);
     }
 
     private static String encodeParams(Map<String, String> params) {

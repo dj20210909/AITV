@@ -13,10 +13,18 @@
         android:orientation="horizontal">
 
         <com.google.android.material.textview.MaterialTextView
-            android:id="@+id/next"
+            android:id="@+id/episodes"
             style="@style/Control"
             android:layout_marginEnd="8dp"
             android:nextFocusLeft="@id/ending"
+            android:text="@string/play_episodes"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/next"
+            style="@style/Control"
+            android:layout_marginEnd="8dp"
             android:text="@string/play_next" />
 
         <com.google.android.material.textview.MaterialTextView

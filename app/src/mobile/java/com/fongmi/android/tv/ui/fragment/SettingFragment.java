@@ -194,7 +194,7 @@ public class SettingFragment extends BaseFragment implements ConfigListener, Sit
     }
 
     @Override
-    public void setTheme(int color) {
+    public void applyThemeColor(int color) {
         Setting.putThemeColor(color);
         RefreshEvent.theme();
     }

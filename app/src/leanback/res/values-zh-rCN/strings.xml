@@ -16,5 +16,6 @@
     <!-- Push -->
     <string name="push_clip">推送剪贴板内容</string>
     <string name="push_info">使用手机扫描二维码，或于浏览器访问地址\n<xliff:g name="name">%s</xliff:g></string>
+    <string name="push_pair">配对码：<xliff:g name="name">%s</xliff:g>（点击刷新，长按重置配对）</string>
 
 </resources>

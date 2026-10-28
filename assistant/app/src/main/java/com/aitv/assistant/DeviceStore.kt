@@ -29,7 +29,8 @@ object DeviceStore {
                     item.optString("version"),
                     item.optString("variant"),
                     item.optBoolean("modern", false),
-                    item.optBoolean("assistant", false)
+                    item.optBoolean("assistant", false),
+                    item.optBoolean("paired", true)
                 )
                 result.add(
                     DeviceEntry(
@@ -58,6 +59,7 @@ object DeviceStore {
             item.put("variant", device.variant ?: "")
             item.put("modern", device.modern)
             item.put("assistant", device.assistant)
+            item.put("paired", device.paired)
             item.put("lastSeen", entry.lastSeen)
             array.put(item)
         }

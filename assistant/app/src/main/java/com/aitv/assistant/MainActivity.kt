@@ -61,6 +61,7 @@ import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Tv
+import androidx.compose.material.icons.rounded.VpnKey
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AlertDialog
@@ -111,6 +112,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -135,6 +137,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AitvClient.loadTokens(TokenStore.load(this))
         val initial = readInitialDevice()
         val initialTab = intent?.getIntExtra("autoTab", 0) ?: 0
         val autoSearch = intent?.getStringExtra("autoSearchWord")
@@ -171,10 +174,39 @@ private fun AssistantApp(
     autoDetailSite: String?,
     autoDetailId: String?
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var selected by remember { mutableStateOf(initial) }
+    var update by remember { mutableStateOf<UpdateManager.Info?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var progress by remember { mutableIntStateOf(0) }
+    var checkTick by remember { mutableIntStateOf(0) }
+    var manualCheck by remember { mutableStateOf(false) }
+
+    // 启动时静默检查一次；从底部「检查更新」触发时给明确反馈。
+    LaunchedEffect(checkTick) {
+        val info = withContext(Dispatchers.IO) { UpdateManager.check(context) }
+        if (info != null) {
+            update = info
+        } else if (manualCheck) {
+            android.widget.Toast.makeText(
+                context,
+                "已是最新版本 v${UpdateManager.currentVersionName(context)}",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+        manualCheck = false
+    }
+
     BackHandler(enabled = selected != null) { selected = null }
     if (selected == null) {
-        DeviceScreen(onSelect = { selected = it })
+        DeviceScreen(
+            onSelect = { selected = it },
+            onCheckUpdate = {
+                manualCheck = true
+                checkTick++
+            }
+        )
     } else {
         ControlScreen(
             device = selected!!,
@@ -185,11 +217,53 @@ private fun AssistantApp(
             initialDetailId = autoDetailId
         )
     }
+
+    val info = update
+    if (info != null) {
+        AlertDialog(
+            onDismissRequest = { if (!busy && !info.force) update = null },
+            title = { Text("发现新版本 ${info.versionName}") },
+            text = {
+                Column {
+                    if (info.content.isNotBlank()) Text(info.content)
+                    if (busy) {
+                        Spacer(Modifier.height(12.dp))
+                        LinearProgressIndicator(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = !busy, onClick = {
+                    if (!UpdateManager.canInstall(context)) {
+                        UpdateManager.openInstallSettings(context)
+                    } else {
+                        busy = true
+                        progress = 0
+                        scope.launch {
+                            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+                            val file = withContext(Dispatchers.IO) {
+                                UpdateManager.download(context, info) { value -> handler.post { progress = value } }
+                            }
+                            busy = false
+                            if (file != null) {
+                                if (!UpdateManager.install(context, file)) android.widget.Toast.makeText(context, "无法启动安装器", android.widget.Toast.LENGTH_SHORT).show()
+                            } else {
+                                android.widget.Toast.makeText(context, "下载或校验失败，请稍后重试", android.widget.Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                }) { Text(if (busy) "下载中 $progress%" else "立即更新") }
+            },
+            dismissButton = if (info.force) null else {
+                { TextButton(enabled = !busy, onClick = { update = null }) { Text("取消") } }
+            },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DeviceScreen(onSelect: (AitvDevice) -> Unit) {
+private fun DeviceScreen(onSelect: (AitvDevice) -> Unit, onCheckUpdate: () -> Unit) {
     val context = LocalContext.current
     val scanner = remember { LanScanner() }
     val entries = remember { mutableStateListOf<DeviceEntry>() }
@@ -412,6 +486,24 @@ private fun DeviceScreen(onSelect: (AitvDevice) -> Unit) {
                     }
                 }
             }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "v${UpdateManager.currentVersionName(context)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(4.dp))
+                TextButton(onClick = onCheckUpdate) {
+                    Text("检查更新", style = MaterialTheme.typography.labelMedium)
+                }
+            }
         }
     }
 
@@ -586,6 +678,14 @@ private fun DeviceCard(entry: DeviceEntry, onClick: () -> Unit, modifier: Modifi
                             color = colors.primary
                         )
                     }
+                    if (!device.paired) {
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "未配对",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.error
+                        )
+                    }
                 }
                 Spacer(Modifier.height(2.dp))
                 Text(
@@ -620,6 +720,8 @@ private fun ControlScreen(
 ) {
     var tab by remember { mutableIntStateOf(initialTab.coerceIn(0, 3)) }
     var playback by remember { mutableStateOf<JSONObject?>(null) }
+    var paired by remember(device.baseUrl) { mutableStateOf(device.paired) }
+    var showPair by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val tabs = listOf("控制", "点播搜索", "频道", "配置")
@@ -651,6 +753,15 @@ private fun ControlScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回")
                     }
+                },
+                actions = {
+                    IconButton(onClick = { showPair = true }) {
+                        Icon(
+                            Icons.Rounded.VpnKey,
+                            contentDescription = if (paired) "配对" else "未配对，点击配对",
+                            tint = if (paired) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             )
         },
@@ -661,6 +772,14 @@ private fun ControlScreen(
                 .padding(padding)
                 .fillMaxSize()
         ) {
+            if (!paired) {
+                AssistChip(
+                    onClick = { showPair = true },
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                    label = { Text("该电视需要配对才能控制") },
+                    leadingIcon = { Icon(Icons.Rounded.VpnKey, contentDescription = null) }
+                )
+            }
             PrimaryTabRow(selectedTabIndex = tab) {
                 tabs.forEachIndexed { index, title ->
                     Tab(
@@ -678,6 +797,81 @@ private fun ControlScreen(
             }
         }
     }
+
+    if (showPair) {
+        PairDialog(
+            device = device,
+            onDismiss = { showPair = false },
+            onPaired = {
+                showPair = false
+                paired = true
+                scope.launch { snackbar.showSnackbar("配对成功，可以开始控制了") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun PairDialog(device: AitvDevice, onDismiss: () -> Unit, onPaired: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var code by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf("") }
+
+    fun submit() {
+        if (code.length != 6 || busy) return
+        busy = true
+        error = ""
+        scope.launch {
+            val token = withContext(Dispatchers.IO) { AitvClient.pair(device.baseUrl, code) }
+            busy = false
+            if (token != null) {
+                TokenStore.put(context, device.baseUrl, token)
+                onPaired()
+            } else {
+                error = "配对码不正确或已过期，请在电视上重新查看"
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text("配对「${device.name}」") },
+        text = {
+            Column {
+                Text(
+                    "在电视上打开推送页面，输入显示的 6 位配对码。配对成功后本机长期有效。",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = code,
+                    onValueChange = { value ->
+                        code = value.filter { it.isDigit() }.take(6)
+                        error = ""
+                    },
+                    label = { Text("配对码") },
+                    singleLine = true,
+                    isError = error.isNotEmpty(),
+                    supportingText = { if (error.isNotEmpty()) Text(error) },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.NumberPassword,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { submit() })
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = code.length == 6 && !busy, onClick = { submit() }) {
+                Text(if (busy) "配对中…" else "配对")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !busy) { Text("取消") }
+        }
+    )
 }
 
 @Composable

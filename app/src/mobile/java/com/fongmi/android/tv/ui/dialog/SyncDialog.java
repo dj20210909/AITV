@@ -1,6 +1,7 @@
 package com.fongmi.android.tv.ui.dialog;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.TypedArray;
 import android.view.LayoutInflater;
@@ -29,6 +30,8 @@ import com.fongmi.android.tv.ui.activity.ScanActivity;
 import com.fongmi.android.tv.ui.adapter.DeviceAdapter;
 import com.fongmi.android.tv.ui.custom.SpaceItemDecoration;
 import com.fongmi.android.tv.utils.Notify;
+import com.fongmi.android.tv.utils.PairPrompt;
+import com.fongmi.android.tv.utils.PeerAuth;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.fongmi.android.tv.utils.ScanTask;
 import com.fongmi.android.tv.utils.Task;
@@ -163,7 +166,8 @@ public class SyncDialog extends BaseBottomSheetDialog implements DeviceAdapter.O
 
     private void send(Device item, String mode, boolean force) {
         String url = String.format(Locale.getDefault(), "%s/action?do=sync&mode=%s&type=%s%s", item.getIp(), mode, type, force ? "&force=true" : "");
-        Runnable request = () -> OkHttp.newCall(client, url, buildBody()).enqueue(getCallback());
+        Context context = getContext();
+        Runnable request = () -> PeerAuth.call(client, item, url, buildBody()).enqueue(getCallback(context, item, mode, force));
         if (type.equals("history")) Task.executeSerial(request);
         else request.run();
     }
@@ -185,10 +189,16 @@ public class SyncDialog extends BaseBottomSheetDialog implements DeviceAdapter.O
         }
     }
 
-    private Callback getCallback() {
+    private Callback getCallback(Context context, Device item, String mode, boolean force) {
         return new Callback() {
             @Override
             public void onResponse(@NonNull Call call, @NonNull Response response) {
+                int code = response.code();
+                response.close();
+                if (code == 401) {
+                    App.post(() -> PairPrompt.show(context, item, () -> send(item, mode, force)));
+                    return;
+                }
                 App.post(() -> onSuccess());
             }
 

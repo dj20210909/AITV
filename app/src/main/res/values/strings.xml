@@ -1,7 +1,7 @@
 <resources xmlns:xliff="http://schemas.android.com/apk/res-auto">
 
     <!-- App -->
-    <string name="app_name">TV</string>
+    <string name="app_name">AITV影视</string>
 
     <!-- Live -->
     <string name="live_pass">Pass</string>
@@ -34,6 +34,7 @@
     <string name="play_other">Other</string>
     <string name="play_next">Next</string>
     <string name="play_prev">Prev</string>
+    <string name="play_episodes">Episodes</string>
     <string name="play_stop">Stop</string>
     <string name="play_repeat">Repeat</string>
     <string name="play_forward">→</string>
@@ -369,6 +370,10 @@
     <string name="update_version">New version <xliff:g name="name">%s</xliff:g></string>
     <string name="update_check">Checking for updates…</string>
     <string name="update_confirm">Update</string>
+    <string name="update_latest">Already up to date</string>
+    <string name="update_failed">Update check failed, please retry</string>
+    <string name="update_broken">Package verification failed, please retry</string>
+    <string name="update_download_failed">Download failed, please retry later</string>
 
     <!-- Crash -->
     <string name="crash_info">An unexpected error occurred.\nSorry for the inconvenience.</string>
@@ -386,6 +391,17 @@
     <string name="none">None</string>
     <string name="times">times</string>
     <string name="lines">lines</string>
+
+    <!-- Server -->
+    <string name="server_pair_required">Target device requires pairing</string>
+    <string name="pair_title">Pair with %1$s</string>
+    <string name="pair_message">Open the push page on the other device and enter the 6-digit pairing code.</string>
+    <string name="pair_code_hint">6-digit code</string>
+    <string name="pair_confirm">Pair</string>
+    <string name="pair_failed">Pairing code is wrong or expired</string>
+    <string name="pair_reset_title">Reset all pairings</string>
+    <string name="pair_reset_message">Every paired phone and TV will lose access and must pair again.</string>
+    <string name="pair_reset_done">Pairings reset</string>
 
     <string-array name="select_decode">
         <item>Soft</item>

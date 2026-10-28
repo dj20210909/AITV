@@ -1,6 +1,7 @@
 package com.fongmi.android.tv.ui.dialog;
 
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
 import androidx.viewbinding.ViewBinding;
 
 import com.fongmi.android.tv.R;
@@ -16,6 +17,10 @@ public class ThemeDialog extends BaseAlertDialog implements ThemeAdapter.OnClick
 
     public static void show(Fragment fragment) {
         new ThemeDialog().show(fragment.getChildFragmentManager(), null);
+    }
+
+    public static void show(FragmentActivity activity) {
+        new ThemeDialog().show(activity.getSupportFragmentManager(), null);
     }
 
     @Override
@@ -35,13 +40,14 @@ public class ThemeDialog extends BaseAlertDialog implements ThemeAdapter.OnClick
 
     @Override
     public void onItemClick(int color) {
-        ((Listener) requireParentFragment()).setTheme(color);
+        Object target = getParentFragment() != null ? getParentFragment() : requireActivity();
+        if (target instanceof Listener) ((Listener) target).applyThemeColor(color);
         dismiss();
     }
 
     public interface Listener {
 
-        void setTheme(int color);
+        void applyThemeColor(int color);
     }
 }
 

@@ -12,6 +12,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.leanback.widget.ArrayObjectAdapter;
+import androidx.leanback.widget.BaseGridView;
 import androidx.leanback.widget.FocusHighlight;
 import androidx.leanback.widget.HorizontalGridView;
 import androidx.leanback.widget.ItemBridgeAdapter;
@@ -143,10 +144,27 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         mBinding.recycler.addOnChildViewHolderSelectedListener(new OnChildViewHolderSelectedListener() {
             @Override
             public void onChildViewHolderSelected(@NonNull RecyclerView parent, @Nullable RecyclerView.ViewHolder child, int position, int subposition) {
-                mBinding.toolbar.setVisibility(position == 0 ? View.VISIBLE : View.GONE);
                 if (mPresenter.isDelete()) setHistoryDelete(false);
             }
         });
+        // 按滚动位置淡出工具栏：触摸滑动不会改变选中行，只有看实际滚动偏移才准确。
+        mBinding.recycler.getViewTreeObserver().addOnPreDrawListener(() -> {
+            updateToolbar();
+            return true;
+        });
+    }
+
+    private void updateToolbar() {
+        int top = Integer.MAX_VALUE;
+        for (int i = 0; i < mBinding.recycler.getChildCount(); i++) top = Math.min(top, mBinding.recycler.getChildAt(i).getTop());
+        float alpha = 1f;
+        if (top != Integer.MAX_VALUE) {
+            int scrolled = mBinding.recycler.getPaddingTop() - top;
+            alpha = 1f - Math.min(1f, Math.max(0, scrolled / (float) ResUtil.dp2px(72)));
+        }
+        if (mBinding.toolbar.getAlpha() != alpha) mBinding.toolbar.setAlpha(alpha);
+        int visibility = alpha > 0.01f ? View.VISIBLE : View.GONE;
+        if (mBinding.toolbar.getVisibility() != visibility) mBinding.toolbar.setVisibility(visibility);
     }
 
     private void checkAction(Intent intent) {
@@ -177,18 +195,34 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         selector.addPresenter(ListRow.class, new CustomRowPresenter(16), VodPresenter.class);
         selector.addPresenter(ListRow.class, new CustomRowPresenter(16), FuncPresenter.class);
         selector.addPresenter(ListRow.class, new CustomRowPresenter(16, FocusHighlight.ZOOM_FACTOR_SMALL, HorizontalGridView.FOCUS_SCROLL_ALIGNED), HistoryPresenter.class);
-        mBinding.recycler.setAdapter(new ItemBridgeAdapter(mAdapter = new ArrayObjectAdapter(selector)));
+        ItemBridgeAdapter bridge = new ItemBridgeAdapter(mAdapter = new ArrayObjectAdapter(selector));
+        mBinding.recycler.setAdapter(bridge);
         mBinding.recycler.setVerticalSpacing(ResUtil.dp2px(16));
+        // 默认 FOCUS_SCROLL_ALIGNED 会在列表重排时把选中行（第 0 行）对到顶部：
+        // 触摸滑动时选中行不会跟着变，一旦滚动中触发重排就会被拽回顶部。
+        mBinding.recycler.setFocusScrollStrategy(BaseGridView.FOCUS_SCROLL_ITEM);
     }
 
     private void setViewModel() {
         mViewModel = new ViewModelProvider(this).get(SiteViewModel.class);
         mViewModel.getResult().observe(this, result -> {
-            mAdapter.remove("progress");
+            if (result == null) return;
+            // 详情页返回等场景 LiveData 会把同一份结果再发一次，重复渲染会把列表滚回顶部
+            if (result == mResult) return;
+            // 列表骨架（功能行 + 推荐标题）还没建好时先不渲染，等下次请求
+            int index = getRecommendIndex();
+            if (index <= 0) return;
+            // 同站点刷新失败（返回空）时保留旧内容，避免整页变空白、再重新排版
+            boolean empty = result.getList().isEmpty();
+            if (empty && mSiteKey != null && mSiteKey.equals(getHome().getKey()) && mAdapter.size() > index) return;
+            clearVideo();
             addVideo(mResult = result);
+            mSiteKey = getHome().getKey();
             Cache.clear().put(result);
         });
     }
+
+    private String mSiteKey;
 
     private void setAdapter() {
         mHistoryAdapter = new ArrayObjectAdapter(mPresenter = new HistoryPresenter(this));
@@ -247,13 +281,16 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     }
 
     private void getVideo() {
+        // 只发起请求，等结果回来再整体替换。加载过程中保留旧内容，
+        // 避免清空列表导致 Leanback 重新布局、选中行丢失或滚回顶部。
         mResult = Result.empty();
-        int index = getRecommendIndex();
-        boolean gone = mAdapter.indexOf("progress") == -1;
-        boolean hasItem = gone && mAdapter.size() > index;
-        if (hasItem) mAdapter.removeItems(index, mAdapter.size() - index);
-        if (gone) mAdapter.add("progress");
         mViewModel.homeContent();
+    }
+
+    private void clearVideo() {
+        int index = getRecommendIndex();
+        int count = mAdapter.size() - index;
+        if (index > 0 && count > 0) mAdapter.removeItems(index, count);
     }
 
     private void addVideo(Result result) {

@@ -1,7 +1,7 @@
 <resources xmlns:xliff="http://schemas.android.com/apk/res-auto">
 
     <!-- App -->
-    <string name="app_name">影视</string>
+    <string name="app_name">AITV影视</string>
 
     <!-- Live -->
     <string name="live_pass">密码</string>
@@ -34,6 +34,7 @@
     <string name="play_other">其它</string>
     <string name="play_next">下集</string>
     <string name="play_prev">上集</string>
+    <string name="play_episodes">选集</string>
     <string name="play_stop">停止</string>
     <string name="play_repeat">循环</string>
     <string name="play_forward">→</string>
@@ -369,6 +370,10 @@
     <string name="update_version">发现新版本 <xliff:g name="name">%s</xliff:g></string>
     <string name="update_check">正在检测更新…</string>
     <string name="update_confirm">更新</string>
+    <string name="update_latest">已是最新版本</string>
+    <string name="update_failed">检查更新失败，请稍后再试</string>
+    <string name="update_broken">安装包校验失败，请重新下载</string>
+    <string name="update_download_failed">更新包下载失败，请稍后重试</string>
 
     <!-- Crash -->
     <string name="crash_info">发生意外错误\n抱歉给您带来不便</string>
@@ -386,6 +391,17 @@
     <string name="none">无</string>
     <string name="times">倍</string>
     <string name="lines">行</string>
+
+    <!-- Server -->
+    <string name="server_pair_required">目标设备需要配对后才能操作</string>
+    <string name="pair_title">与 %1$s 配对</string>
+    <string name="pair_message">在对方设备的推送页上查看 6 位配对码并输入。</string>
+    <string name="pair_code_hint">6 位配对码</string>
+    <string name="pair_confirm">配对</string>
+    <string name="pair_failed">配对码不正确或已过期</string>
+    <string name="pair_reset_title">重置所有配对</string>
+    <string name="pair_reset_message">重置后所有已配对的手机和电视都会失效，需要重新配对。</string>
+    <string name="pair_reset_done">已重置配对</string>
 
     <string-array name="select_decode">
         <item>软解</item>

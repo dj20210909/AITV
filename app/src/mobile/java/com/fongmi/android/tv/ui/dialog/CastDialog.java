@@ -1,6 +1,7 @@
 package com.fongmi.android.tv.ui.dialog;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -31,6 +32,8 @@ import com.fongmi.android.tv.ui.activity.ScanActivity;
 import com.fongmi.android.tv.ui.adapter.DeviceAdapter;
 import com.fongmi.android.tv.ui.custom.SpaceItemDecoration;
 import com.fongmi.android.tv.utils.Notify;
+import com.fongmi.android.tv.utils.PairPrompt;
+import com.fongmi.android.tv.utils.PeerAuth;
 import com.fongmi.android.tv.utils.ScanTask;
 import com.github.catvod.net.OkHttp;
 import com.github.catvod.utils.Path;
@@ -53,6 +56,8 @@ public class CastDialog extends BaseBottomSheetDialog implements DeviceAdapter.O
     private DeviceAdapter adapter;
     private ScanTask scanTask;
     private CastVideo video;
+    private Device pending;
+    private Context castContext;
     private boolean fm;
 
     public CastDialog() {
@@ -166,7 +171,14 @@ public class CastDialog extends BaseBottomSheetDialog implements DeviceAdapter.O
     @Override
     public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
         try (Response res = response) {
-            if (res.body().string().equals("OK")) App.post(this::onCasted);
+            if (res.code() == 401) {
+                Device target = pending;
+                Context context = castContext;
+                App.post(() -> {
+                    if (target == null || context == null) return;
+                    PairPrompt.show(context, target, () -> cast(target));
+                });
+            } else if (res.body().string().equals("OK")) App.post(this::onCasted);
             else App.post(() -> Notify.show(R.string.device_offline));
         }
     }
@@ -174,7 +186,13 @@ public class CastDialog extends BaseBottomSheetDialog implements DeviceAdapter.O
     @Override
     public void onItemClick(Device item) {
         if (item.isDLNA()) new DLNACast(video, this::onCasted).cast(item);
-        else OkHttp.newCall(client, item.getIp().concat("/action?do=cast"), body.build()).enqueue(this);
+        else cast(item);
+    }
+
+    private void cast(Device item) {
+        pending = item;
+        castContext = getContext();
+        PeerAuth.call(client, item, item.getIp().concat("/action?do=cast"), body.build()).enqueue(this);
     }
 
     @Override

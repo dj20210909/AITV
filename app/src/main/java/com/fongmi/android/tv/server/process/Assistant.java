@@ -23,8 +23,10 @@ import com.fongmi.android.tv.bean.Site;
 import com.fongmi.android.tv.bean.Vod;
 import com.fongmi.android.tv.db.AppDatabase;
 import com.fongmi.android.tv.impl.Callback;
+import com.fongmi.android.tv.server.Auth;
 import com.fongmi.android.tv.server.Nano;
 import com.fongmi.android.tv.server.impl.Process;
+import com.fongmi.android.tv.utils.Notify;
 import com.fongmi.android.tv.utils.Util;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -63,6 +65,9 @@ import fi.iki.elonen.NanoHTTPD.Response;
  */
 public class Assistant implements Process {
 
+    /** /assistant/* 协议版本，助手端据此判断控制端能力是否匹配。 */
+    public static final int API_VERSION = 2;
+
     private static final int MAX_CHANNELS = 5000;
 
     @Override
@@ -96,7 +101,7 @@ public class Assistant implements Process {
                 if (url.equals("/assistant/vod/resolve")) return resolve(session.getParms());
                 return open(session.getParms());
             }
-            if (url.equals("/assistant/info")) return Nano.ok(info().toString());
+            if (url.equals("/assistant/info")) return Nano.ok(info(session).toString());
             if (url.equals("/assistant/configs")) return Nano.ok(configs().toString());
             if (url.equals("/assistant/sites")) return Nano.ok(sites().toString());
             if (url.equals("/assistant/vod/home")) return Nano.ok(vodHome(session.getParms()).toString());
@@ -454,29 +459,34 @@ public class Assistant implements Process {
     private record Hit(Site site, Vod vod) {
     }
 
-    private Response config(Map<String, String> params) throws InterruptedException {
+    private Response config(Map<String, String> params) {
         String text = trim(params.get("text"));
         String name = trim(params.get("name"));
         if (text.isEmpty()) return Nano.error("Missing config URL");
         int type = configType(params);
         Config config = name.isEmpty() ? Config.find(text, type) : Config.find(text, name, type);
-        // Persist immediately so the pushed URL is visible in the app's config history,
-        // even if the network load is slow or temporarily fails.
+        // 先落库，再后台加载：写入结果不再依赖加载耗时和当前界面，
+        // 否则电视主线程一忙（播放中、弹窗、重建）就会把已成功的写入报成失败。
         config.setTime(System.currentTimeMillis());
         config.save();
-        String error = loadConfig(config);
-        if (error != null) return Nano.error(error);
-        config.update();
-        return Nano.ok("OK");
+        startLoad(config);
+        return accepted(config);
     }
 
-    private Response activate(Map<String, String> params) throws InterruptedException {
+    private Response activate(Map<String, String> params) {
         Config config = findConfig(params);
         if (config == null) return Nano.error("Config not found");
-        String error = loadConfig(config);
-        if (error != null) return Nano.error(error);
-        config.update();
-        return Nano.ok("OK");
+        startLoad(config);
+        return accepted(config);
+    }
+
+    private Response accepted(Config config) {
+        JsonObject json = new JsonObject();
+        json.addProperty("success", true);
+        json.addProperty("loading", true);
+        json.addProperty("id", config.getId());
+        json.addProperty("type", config.getType());
+        return Nano.ok(json.toString());
     }
 
     private Response delete(Map<String, String> params) {
@@ -553,30 +563,30 @@ public class Assistant implements Process {
         };
     }
 
-    private String loadConfig(Config config) throws InterruptedException {
+    /**
+     * 后台加载配置，立即返回。成功时刷新配置时间戳；失败在电视上弹出提示，
+     * 不再用它去否决已经落库的推送结果。
+     */
+    private void startLoad(Config config) {
         int type = config.getType();
-        CountDownLatch latch = new CountDownLatch(1);
-        AtomicReference<String> error = new AtomicReference<>();
         Callback callback = new Callback() {
             @Override
             public void success() {
-                latch.countDown();
+                config.update();
             }
 
             @Override
             public void error(String msg) {
-                error.set(msg == null || msg.isEmpty() ? "Config load failed" : msg);
-                latch.countDown();
+                String text = msg == null || msg.isEmpty() ? "Config load failed" : msg;
+                App.post(() -> Notify.show(text));
             }
         };
         if (type == 1) LiveConfig.load(config, callback);
         else if (type == 2) WallConfig.load(config, callback);
         else VodConfig.load(config, callback);
-        if (!latch.await(20, TimeUnit.SECONDS)) return "Config load timeout";
-        return error.get();
     }
 
-    private JsonObject info() {
+    private JsonObject info(IHTTPSession session) {
         Live live = loadLive();
         JsonObject root = new JsonObject();
         root.addProperty("name", "AITV");
@@ -585,6 +595,9 @@ public class Assistant implements Process {
         root.addProperty("variant", BuildConfig.FLAVOR);
         root.addProperty("device", Util.getDeviceName());
         root.addProperty("ip", com.github.catvod.utils.Util.getIp());
+        root.addProperty("apiVersion", API_VERSION);
+        // 未携带有效令牌时告知调用方需要配对，助手据此提示用户输入配对码。
+        root.addProperty("paired", Auth.get().paired(session));
         JsonObject liveInfo = new JsonObject();
         liveInfo.addProperty("name", live.getName());
         liveInfo.addProperty("groups", live.getGroups().size());

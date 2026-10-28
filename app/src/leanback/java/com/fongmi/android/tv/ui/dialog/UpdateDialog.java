@@ -17,6 +17,7 @@ public class UpdateDialog extends BaseAlertDialog {
     private UpdateListener listener;
     private String title;
     private String desc;
+    private boolean forced;
 
     public static UpdateDialog create() {
         return new UpdateDialog();
@@ -29,6 +30,11 @@ public class UpdateDialog extends BaseAlertDialog {
 
     public UpdateDialog desc(String desc) {
         this.desc = desc;
+        return this;
+    }
+
+    public UpdateDialog forced(boolean forced) {
+        this.forced = forced;
         return this;
     }
 
@@ -56,6 +62,7 @@ public class UpdateDialog extends BaseAlertDialog {
     protected void initView() {
         binding.version.setText(title);
         binding.desc.setText(desc);
+        binding.cancel.setVisibility(forced ? View.GONE : View.VISIBLE);
     }
 
     @Override
