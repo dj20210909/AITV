@@ -1,6 +1,7 @@
 package com.fongmi.android.tv.ui.adapter;
 
 import android.graphics.Paint;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -104,17 +105,44 @@ public class EpisodeAdapter extends RecyclerView.Adapter<EpisodeAdapter.ViewHold
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Episode item = mItems.get(position);
         holder.binding.text.setMaxWidth(maxWidth);
-        if (mItems.size() > span) {
-            // 只在首行/末行接管上下键，网格内部交给系统按几何位置找焦点
-            holder.binding.text.setNextFocusUpId(position < span ? nextFocusUp : View.NO_ID);
-            holder.binding.text.setNextFocusDownId(position >= mItems.size() - span ? nextFocusDown : View.NO_ID);
-        } else {
-            holder.binding.text.setNextFocusUpId(nextFocusUp);
-            holder.binding.text.setNextFocusDownId(nextFocusDown);
-        }
+        // 只有首行按上、末行按下才交给网格外的控件，其余方向在网格内连续移动
+        holder.binding.text.setNextFocusUpId(position < span ? nextFocusUp : View.NO_ID);
+        holder.binding.text.setNextFocusDownId(position + span >= mItems.size() ? nextFocusDown : View.NO_ID);
+        holder.binding.text.setOnKeyListener((view, keyCode, event) -> event.getAction() == KeyEvent.ACTION_DOWN && moveFocus(view, position, span, mItems.size(), keyCode));
         holder.binding.text.setSelected(item.isSelected());
         holder.binding.text.setText(item.getDesc().concat(item.getName()));
         holder.binding.getRoot().setOnClickListener(v -> mListener.onItemClick(item));
+    }
+
+    /**
+     * 网格内焦点连续：左右在整张网格里按顺序走（行末接着下一行），上下按列跳。
+     * 上下越界返回 false，交给系统去找网格外的控件；左右越界则原地停住。
+     */
+    public static boolean moveFocus(View view, int position, int span, int count, int keyCode) {
+        int target;
+        boolean stay = false;
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+            target = position - span;
+        } else if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            target = position + span;
+        } else if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+            target = position - 1;
+            stay = true;
+        } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
+            target = position + 1;
+            stay = true;
+        } else {
+            return false;
+        }
+        if (target < 0 || target >= count) return stay;
+        if (!(view.getParent() instanceof RecyclerView)) return false;
+        RecyclerView recycler = (RecyclerView) view.getParent();
+        RecyclerView.ViewHolder holder = recycler.findViewHolderForAdapterPosition(target);
+        if (holder == null) {
+            recycler.scrollToPosition(target);
+            return true;
+        }
+        return holder.itemView.requestFocus();
     }
 
     public interface OnClickListener {

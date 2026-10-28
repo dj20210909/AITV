@@ -256,8 +256,8 @@
                 android:visibility="gone"
                 tools:visibility="visible" />
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/episode"
+            <androidx.leanback.widget.HorizontalGridView
+                android:id="@+id/array"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
@@ -267,13 +267,14 @@
                 android:paddingEnd="24dp"
                 android:visibility="gone" />
 
-            <androidx.leanback.widget.HorizontalGridView
-                android:id="@+id/array"
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/episode"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
                 android:clipChildren="false"
                 android:clipToPadding="false"
+                android:focusable="false"
                 android:paddingStart="24dp"
                 android:paddingEnd="24dp"
                 android:visibility="gone" />

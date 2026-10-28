@@ -1,5 +1,6 @@
 package com.fongmi.android.tv.ui.dialog;
 
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
 
@@ -12,6 +13,7 @@ import androidx.viewbinding.ViewBinding;
 import com.fongmi.android.tv.bean.Episode;
 import com.fongmi.android.tv.databinding.AdapterEpisodeItemBinding;
 import com.fongmi.android.tv.databinding.DialogEpisodeBinding;
+import com.fongmi.android.tv.ui.adapter.EpisodeAdapter;
 import com.fongmi.android.tv.ui.custom.SpaceItemDecoration;
 import com.fongmi.android.tv.utils.ResUtil;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -25,6 +27,7 @@ public class EpisodeDialog extends BaseAlertDialog {
     private DialogEpisodeBinding binding;
     private ItemAdapter adapter;
     private OnClickListener listener;
+    private int span = 1;
 
     public static EpisodeDialog create() {
         return new EpisodeDialog();
@@ -59,7 +62,7 @@ public class EpisodeDialog extends BaseAlertDialog {
     protected void initView() {
         int available = (int) (ResUtil.getScreenWidth() * 0.8) - ResUtil.dp2px(64);
         int cell = cellWidth(items);
-        int span = Math.max(4, available / cell);
+        span = Math.max(4, available / cell);
         ViewGroup.LayoutParams params = binding.recycler.getLayoutParams();
         params.height = (int) (ResUtil.getScreenHeight() * 0.55);
         binding.recycler.setLayoutParams(params);
@@ -129,6 +132,8 @@ public class EpisodeDialog extends BaseAlertDialog {
             Episode item = items.get(position);
             holder.binding.text.setText(item.getDesc().concat(item.getName()));
             holder.binding.text.setSelected(item.isSelected());
+            // 弹窗里没有其它控件，网格内焦点一直连续，走到边界就停住
+            holder.binding.text.setOnKeyListener((view, keyCode, event) -> event.getAction() == KeyEvent.ACTION_DOWN && EpisodeAdapter.moveFocus(view, position, span, items.size(), keyCode));
             holder.binding.text.setOnClickListener(view -> {
                 if (listener != null) listener.onItemClick(item);
                 dismiss();
