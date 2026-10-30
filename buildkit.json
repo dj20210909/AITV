@@ -1,0 +1,91 @@
+{
+  "type": "android",
+  "app": {
+    "label": "AITV影视",
+    "package": "com.fongmi.android.tv",
+    "versionFile": "app/build.gradle"
+  },
+  "android": {
+    "module": ":app",
+    "gradlew": "gradlew.bat",
+    "tasks": {
+      "leanback": ":app:assembleLeanbackRelease",
+      "mobile": ":app:assembleMobileRelease"
+    },
+    "defaultTarget": "leanback",
+    "apkGlob": {
+      "leanback": "Release/apk/aitv-leanback-*.apk",
+      "mobile": "Release/apk/aitv-mobile-*.apk"
+    },
+    "abiSplit": true,
+    "requireJdk": 21,
+    "parkGradleDaemonProps": true,
+    "initScript": "tmp/mirror.init.gradle",
+    "offline": true,
+    "install": { "suFallback": true }
+  },
+  "icons": {
+    "source": "tmp/资源/应用logo",
+    "mode": "asis",
+    "match": {
+      "app": "*-phone-*",
+      "banner": "*-tv-*",
+      "assistant": "*助手*"
+    },
+    "targets": [
+      {
+        "source": "app",
+        "res": "app/src/main/res",
+        "bucket": "xxxhdpi",
+        "names": ["ic_launcher.png", "ic_launcher_round.png", "ic_launcher_foreground.png"],
+        "filter": "ic_launcher*.png"
+      },
+      {
+        "source": "banner",
+        "res": "app/src/leanback/res",
+        "bucket": "xxhdpi",
+        "names": ["ic_banner.png"],
+        "filter": "ic_banner*.png"
+      },
+      {
+        "source": "assistant",
+        "res": "assistant/app/src/main/res",
+        "bucket": "xxxhdpi",
+        "names": ["ic_launcher.png", "ic_launcher_round.png", "ic_launcher_foreground.png"],
+        "filter": "ic_launcher*.png"
+      }
+    ]
+  },
+  "release": {
+    "store": "https://nodeapp.uandj.site",
+    "storeRef": "aitv-leanback-arm64-v8a",
+    "editNotes": true,
+    "notesDefault": "1. 修复已知问题\r\n2. 优化播放体验",
+    "apps": {
+      "leanback-arm64_v8a": {
+        "appKey": "aitv-leanback-arm64-v8a",
+        "appName": "AITV-TV-arm64-v8a",
+        "target": "leanback",
+        "abi": "arm64-v8a"
+      },
+      "leanback-armeabi_v7a": {
+        "appKey": "aitv-leanback-armeabi-v7a",
+        "appName": "AITV-TV-armeabi-v7a",
+        "target": "leanback",
+        "abi": "armeabi-v7a"
+      },
+      "mobile-arm64_v8a": {
+        "appKey": "aitv-mobile-arm64-v8a",
+        "appName": "AITV-Phone-arm64-v8a",
+        "target": "mobile",
+        "abi": "arm64-v8a"
+      },
+      "mobile-armeabi_v7a": {
+        "appKey": "aitv-mobile-armeabi-v7a",
+        "appName": "AITV-Phone-armeabi-v7a",
+        "target": "mobile",
+        "abi": "armeabi-v7a"
+      }
+    }
+  }
+}

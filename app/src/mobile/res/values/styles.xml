@@ -8,7 +8,7 @@
 
     <style name="Theme.Splash" parent="Theme.SplashScreen">
         <item name="postSplashScreenTheme">@style/Theme.App</item>
-        <item name="windowSplashScreenBackground">#040929</item>
+        <item name="windowSplashScreenBackground">#030A2C</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
     </style>
 

@@ -1,0 +1,53 @@
+{
+  "type": "android",
+  "app": {
+    "label": "AITV 助手",
+    "package": "com.aitv.assistant",
+    "versionFile": "app/build.gradle"
+  },
+  "android": {
+    "gradlew": "../gradlew.bat",
+    "projectDir": ".",
+    "tasks": {
+      "release": ":app:assembleRelease"
+    },
+    "defaultTarget": "release",
+    "apkGlob": {
+      "release": "app/build/outputs/apk/release/aitv-assistant-*-release.apk"
+    },
+    "abiSplit": false,
+    "requireJdk": 21,
+    "initScript": "../tmp/mirror.init.gradle",
+    "offline": true,
+    "install": { "suFallback": true }
+  },
+  "icons": {
+    "source": "../tmp/资源/应用logo",
+    "mode": "asis",
+    "match": {
+      "app": "*助手*"
+    },
+    "targets": [
+      {
+        "source": "app",
+        "res": "app/src/main/res",
+        "bucket": "xxxhdpi",
+        "names": ["ic_launcher.png", "ic_launcher_round.png", "ic_launcher_foreground.png"],
+        "filter": "ic_launcher*.png"
+      }
+    ]
+  },
+  "release": {
+    "store": "https://nodeapp.uandj.site",
+    "storeRef": "aitv-assistant",
+    "editNotes": false,
+    "notesDefault": "1. 修复已知问题",
+    "apps": {
+      "release": {
+        "appKey": "aitv-assistant",
+        "appName": "AITV-Assistant",
+        "apk": "aitv-assistant-*.apk"
+      }
+    }
+  }
+}
